@@ -59,9 +59,3 @@ app.dependency_overrides[get_db] = override_get_db
 def client():
     with TestClient(app) as test_client:
         yield test_client
-
-
-def pytest_report_teststatus(report, config):
-    """Customize status representation to show 'missed' instead of 'failed'."""
-    if report.when == "call" and report.failed:
-        return "missed", "M", ("MISSED", {"red": True})
