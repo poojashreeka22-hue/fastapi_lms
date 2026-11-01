@@ -22,6 +22,20 @@ app = FastAPI(
 )
 
 
+@app.get("/", tags=["Root"])
+def root():
+    return {
+        "message": "Welcome to the Library Management System API!",
+        "documentation": "/docs",
+        "endpoints": {
+            "books": "/books/",
+            "members": "/members/",
+            "borrow": "/borrow/",
+            "return": "/return/",
+        },
+    }
+
+
 # --- 1. Add a book ---
 @app.post(
     "/books/",
