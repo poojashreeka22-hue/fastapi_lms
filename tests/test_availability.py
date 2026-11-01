@@ -3,10 +3,10 @@ from app import crud, schemas
 
 
 # =====================================================================
-# THE 1 TEST IN THIS FILE THAT FAILS INITIALLY DUE TO THE BORROWING BUG
+# THE 2 TESTS IN THIS FILE THAT FAIL INITIALLY DUE TO THE BORROWING BUG
 # =====================================================================
 
-def test_book_availability_after_borrow(client):
+def test_book_availability_after_borrow_single_copy(client):
     """Business rule: When the last available copy of a book is borrowed, availability must become 0 and is_available False."""
     b_res = client.post("/books/", json={
         "title": "Unique Manuscript",
@@ -24,14 +24,12 @@ def test_book_availability_after_borrow(client):
     })
     member_id = m_res.json()["id"]
 
-    # Borrow the only copy
     borrow_res = client.post("/borrow/", json={"book_id": book_id, "member_id": member_id})
     assert borrow_res.status_code == 201
 
     avail_res = client.get(f"/books/{book_id}/availability")
     assert avail_res.status_code == 200
     data = avail_res.json()
-    # Under the bug, available_copies is incremented to 2 instead of decremented to 0!
     assert data["available_copies"] == 0, (
         f"Expected available copies to be 0 after borrowing the only copy, but got {data['available_copies']}"
     )
@@ -40,8 +38,37 @@ def test_book_availability_after_borrow(client):
     )
 
 
+def test_book_availability_after_borrow_multi_copy(client):
+    """Business rule: Availability endpoint must reflect reduced copies after a book is borrowed."""
+    b_res = client.post("/books/", json={
+        "title": "Multi Copy Avail Book",
+        "author": "Author",
+        "isbn": "ISBN-AVAIL-FAIL-002",
+        "category": "Fiction",
+        "available_copies": 5,
+    })
+    book_id = b_res.json()["id"]
+
+    m_res = client.post("/members/", json={
+        "name": "Grace",
+        "email": "grace_avail@library.org",
+        "phone": "555-1122",
+    })
+    member_id = m_res.json()["id"]
+
+    borrow_res = client.post("/borrow/", json={"book_id": book_id, "member_id": member_id})
+    assert borrow_res.status_code == 201
+
+    avail_res = client.get(f"/books/{book_id}/availability")
+    assert avail_res.status_code == 200
+    data = avail_res.json()
+    assert data["available_copies"] == 4, (
+        f"Expected available copies to be 4 after borrowing 1 of 5 copies, but got {data['available_copies']}"
+    )
+
+
 # =====================================================================
-# THE REMAINING 149 TESTS IN THIS FILE (ALL PASS)
+# THE REMAINING 148 TESTS IN THIS FILE (ALL PASS)
 # =====================================================================
 
 # 1. Books with available copies report is_available=True (60 tests)
@@ -108,11 +135,11 @@ def test_availability_not_found(client, idx, missing_id):
     assert "not found" in res.json()["detail"].lower()
 
 
-# 4. Book availability after return operation (19 tests)
+# 4. Book availability after return operation (18 tests)
 @pytest.mark.parametrize(
     "idx",
-    range(19),
-    ids=[f"avail_after_return_{i:03d}" for i in range(19)],
+    range(18),
+    ids=[f"avail_after_return_{i:03d}" for i in range(18)],
 )
 def test_availability_after_return(client, db_session, idx):
     book = crud.create_book(db_session, schemas.BookCreate(

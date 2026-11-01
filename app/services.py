@@ -135,8 +135,9 @@ def borrow_book_service(
             detail="No copies available for borrowing",
         )
 
-    # Business Rule: Borrowing a book must decrease available copies by one.
-    book.available_copies -= 1
+    # BUG: Incorrect available-copy handling when borrowing a book.
+    # The developer mistakenly incremented available copies instead of decrementing.
+    book.available_copies += 1  # Should be: book.available_copies -= 1
 
     today = date.today()
     borrow_date_str = today.isoformat()
