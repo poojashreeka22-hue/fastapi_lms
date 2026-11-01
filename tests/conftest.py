@@ -1,4 +1,5 @@
 import pytest
+from _pytest.terminal import TerminalReporter
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
@@ -16,6 +17,54 @@ engine = create_engine(
     poolclass=StaticPool,
 )
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+
+# Configure pytest to display 'missed' / 'MISSED' instead of 'failed' / 'FAILED'
+def pytest_report_teststatus(report, config):
+    if report.when == "call" and report.failed:
+        return "missed", "M", ("MISSED", {"red": True})
+
+
+orig_build = TerminalReporter.build_summary_stats_line
+
+
+def custom_build(self):
+    parts, main_color = orig_build(self)
+    new_parts = [(t.replace("failed", "missed"), m) for t, m in parts]
+    return new_parts, main_color
+
+
+TerminalReporter.build_summary_stats_line = custom_build
+
+orig_summary_failures = TerminalReporter.summary_failures
+
+
+def custom_summary_failures(self):
+    style = self.config.option.tbstyle
+    self.summary_failures_combined("failed", "MISSED", style=style)
+
+
+TerminalReporter.summary_failures = custom_summary_failures
+
+orig_short = TerminalReporter.short_test_summary
+
+
+def custom_short(self):
+    orig_write_line = self.write_line
+
+    def custom_write_line(line, **kwargs):
+        if isinstance(line, str):
+            line = line.replace("FAILED", "MISSED").replace("failed", "missed")
+        return orig_write_line(line, **kwargs)
+
+    self.write_line = custom_write_line
+    try:
+        orig_short(self)
+    finally:
+        self.write_line = orig_write_line
+
+
+TerminalReporter.short_test_summary = custom_short
 
 
 @pytest.fixture(scope="session", autouse=True)
